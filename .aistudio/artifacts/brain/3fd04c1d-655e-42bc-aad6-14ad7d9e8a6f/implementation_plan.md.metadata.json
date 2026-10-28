@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan to prepare the PersonaNet native Android application for automatic compilation using GitHub Actions (.github/workflows/android.yml), generate missing Gradle wrapper files (gradlew, gradlew.bat, wrapper jar), configure Java 17/21 Android build environment, handle debug keystore generation for CI, and upload the debug APK artifact.",
+  "updatedAt":  "2026-10-28T20:39:12.902629176Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

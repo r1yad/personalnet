@@ -1,0 +1,8 @@
+{
+  "name": "PersonaNet",
+  "description": "Offline role-playing social media simulator where users create personas, post feeds, direct message, and manage their fictional network.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

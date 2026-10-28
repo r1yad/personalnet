@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Glow Circle -->
+    <path
+        android:fillColor="#252A42"
+        android:pathData="M54,18 A36,36 0 1,0 54,90 A36,36 0 1,0 54,18 Z"/>
+
+    <!-- Drama / Persona Masks and Social Bubble -->
+    <!-- Primary Persona Mask -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M44,34 C33,34 26,42 26,53 C26,63 33,68 39,69 L39,76 L46,71 C48,71 50,71 52,70 C49,66 48,61 48,56 C48,44 55,36 64,34 C58,34 50,34 44,34 Z"/>
+    
+    <!-- Secondary Persona Mask / Bubble (Intersecting) -->
+    <path
+        android:fillColor="#B388FF"
+        android:pathData="M64,38 C55,38 48,46 48,56 C48,66 55,74 64,74 C66,74 68,74 70,73 L76,77 L76,71 C80,68 82,62 82,56 C82,46 74,38 64,38 Z"/>
+
+    <!-- Persona Eye Details -->
+    <!-- Cyan mask eye -->
+    <path
+        android:fillColor="#151722"
+        android:pathData="M35,48 A2.5,3.5 0 1,0 35,55 A2.5,3.5 0 1,0 35,48 Z"/>
+    <path
+        android:fillColor="#151722"
+        android:pathData="M44,48 A2.5,3.5 0 1,0 44,55 A2.5,3.5 0 1,0 44,48 Z"/>
+    <!-- Cyan smile curve -->
+    <path
+        android:strokeColor="#151722"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M35,61 Q40,65 45,61"/>
+
+    <!-- Purple mask eye -->
+    <path
+        android:fillColor="#151722"
+        android:pathData="M58,50 A2.5,3.5 0 1,0 58,57 A2.5,3.5 0 1,0 58,50 Z"/>
+    <path
+        android:fillColor="#151722"
+        android:pathData="M70,50 A2.5,3.5 0 1,0 70,57 A2.5,3.5 0 1,0 70,50 Z"/>
+    <!-- Purple smile curve -->
+    <path
+        android:strokeColor="#151722"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M59,64 Q64,67 69,64"/>
+</vector>
