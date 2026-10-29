@@ -38,4 +38,24 @@ class AppPreferences(private val context: Context) {
             prefs[KEY_MEDIA_QUALITY] = quality
         }
     }
+
+    fun getPostDraft(personaId: String): Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[stringPreferencesKey("draft_post_$personaId")] ?: ""
+    }
+
+    suspend fun savePostDraft(personaId: String, text: String) {
+        context.dataStore.edit { prefs ->
+            if (text.isBlank()) {
+                prefs.remove(stringPreferencesKey("draft_post_$personaId"))
+            } else {
+                prefs[stringPreferencesKey("draft_post_$personaId")] = text
+            }
+        }
+    }
+
+    suspend fun clearPostDraft(personaId: String) {
+        context.dataStore.edit { prefs ->
+            prefs.remove(stringPreferencesKey("draft_post_$personaId"))
+        }
+    }
 }

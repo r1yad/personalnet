@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -156,13 +158,45 @@ fun ChatScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
             )
         },
-        bottomBar = {
+        contentWindowInsets = WindowInsets.statusBars
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = innerPadding.calculateTopPadding())
+                .imePadding()
+                .navigationBarsPadding()
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(
+                    items = messages,
+                    key = { it.message.id },
+                    contentType = { "chat_message" }
+                ) { msgDetails ->
+                    val isFromMe = msgDetails.sender.id == activePersona.id
+                    MessageBubble(
+                        msgDetails = msgDetails,
+                        isFromMe = isFromMe,
+                        onReply = { replyingToMessage = msgDetails },
+                        onEdit = { editingMessage = msgDetails },
+                        onDelete = { onDeleteMessage(msgDetails.message.id) },
+                        onMediaClick = onMediaClick
+                    )
+                }
+            }
+
+            // Input Bar Composer Docked Above Keyboard
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(DarkSurface)
-                    .imePadding()
-                    .navigationBarsPadding()
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 // Reply target banner
@@ -247,7 +281,7 @@ fun ChatScreen(
                     }
                 }
 
-                // Input bar
+                // Input row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -304,27 +338,6 @@ fun ChatScreen(
                         )
                     }
                 }
-            }
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(messages, key = { it.message.id }) { msgDetails ->
-                val isFromMe = msgDetails.sender.id == activePersona.id
-                MessageBubble(
-                    msgDetails = msgDetails,
-                    isFromMe = isFromMe,
-                    onReply = { replyingToMessage = msgDetails },
-                    onEdit = { editingMessage = msgDetails },
-                    onDelete = { onDeleteMessage(msgDetails.message.id) },
-                    onMediaClick = onMediaClick
-                )
             }
         }
     }

@@ -214,7 +214,11 @@ fun PersonasScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(filteredPersonas, key = { it.id }) { persona ->
+                    items(
+                        items = filteredPersonas,
+                        key = { it.id },
+                        contentType = { "persona_card" }
+                    ) { persona ->
                         PersonaCardItem(
                             persona = persona,
                             isActive = persona.id == activePersonaId,

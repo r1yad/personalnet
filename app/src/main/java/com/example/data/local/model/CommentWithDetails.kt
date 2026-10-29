@@ -1,8 +1,10 @@
 package com.example.data.local.model
 
+import androidx.compose.runtime.Immutable
 import com.example.data.local.entity.CommentEntity
 import com.example.data.local.entity.PersonaEntity
 
+@Immutable
 data class CommentWithDetails(
     val comment: CommentEntity,
     val author: PersonaEntity,

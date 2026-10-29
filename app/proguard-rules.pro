@@ -12,10 +12,21 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Room Database
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
+-keep class com.example.data.local.entity.** { *; }
+-keep class com.example.data.local.model.** { *; }
+-keep class com.example.data.local.dao.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Moshi / JSON Serialization
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class com.squareup.moshi.** { *; }
+-keepclassmembers class * {
+    @com.squareup.moshi.* <fields>;
+    @com.squareup.moshi.* <methods>;
+}
+
+# Coroutines & Coil
+-dontwarn kotlinx.coroutines.**
+-keep class coil.** { *; }

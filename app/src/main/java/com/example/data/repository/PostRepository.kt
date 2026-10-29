@@ -12,7 +12,6 @@ import com.example.data.local.model.PostWithDetails
 import com.example.data.media.MediaManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
 import java.util.UUID
 
 class PostRepository(
@@ -25,17 +24,25 @@ class PostRepository(
     fun getFeedPosts(activePersonaId: String?): Flow<List<PostWithDetails>> {
         return combine(
             postDao.getAllPosts(),
-            personaDao.getAllPersonas()
-        ) { posts, personas ->
+            personaDao.getAllPersonas(),
+            postDao.getAllPostMediaFlow(),
+            likeDao.getAllPostLikesFlow(),
+            commentDao.getAllCommentCountsFlow()
+        ) { posts, personas, allMedia, allLikes, commentCounts ->
             val personaMap = personas.associateBy { it.id }
+            val mediaMap = allMedia.groupBy { it.postId }
+            val likesMap = allLikes.groupBy { it.postId }
+            val commentMap = commentCounts.associate { it.postId to it.count }
+
             posts.mapNotNull { post ->
                 val author = personaMap[post.authorPersonaId] ?: return@mapNotNull null
-                val media = postDao.getMediaForPostDirect(post.id)
-                val likeCount = likeDao.getPostLikeCountDirect(post.id)
+                val media = mediaMap[post.id]?.sortedBy { it.orderIndex } ?: emptyList()
+                val postLikes = likesMap[post.id] ?: emptyList()
+                val likeCount = postLikes.size
                 val isLiked = if (activePersonaId != null) {
-                    likeDao.isPostLikedByPersonaDirect(post.id, activePersonaId)
+                    postLikes.any { it.personaId == activePersonaId }
                 } else false
-                val commentCount = commentDao.getCommentCountForPostDirect(post.id)
+                val commentCount = commentMap[post.id] ?: 0
 
                 PostWithDetails(
                     post = post,
@@ -52,17 +59,25 @@ class PostRepository(
     fun getPostsByPersona(personaId: String, activePersonaId: String?): Flow<List<PostWithDetails>> {
         return combine(
             postDao.getPostsByPersona(personaId),
-            personaDao.getAllPersonas()
-        ) { posts, personas ->
+            personaDao.getAllPersonas(),
+            postDao.getAllPostMediaFlow(),
+            likeDao.getAllPostLikesFlow(),
+            commentDao.getAllCommentCountsFlow()
+        ) { posts, personas, allMedia, allLikes, commentCounts ->
             val personaMap = personas.associateBy { it.id }
+            val mediaMap = allMedia.groupBy { it.postId }
+            val likesMap = allLikes.groupBy { it.postId }
+            val commentMap = commentCounts.associate { it.postId to it.count }
+
             posts.mapNotNull { post ->
                 val author = personaMap[post.authorPersonaId] ?: return@mapNotNull null
-                val media = postDao.getMediaForPostDirect(post.id)
-                val likeCount = likeDao.getPostLikeCountDirect(post.id)
+                val media = mediaMap[post.id]?.sortedBy { it.orderIndex } ?: emptyList()
+                val postLikes = likesMap[post.id] ?: emptyList()
+                val likeCount = postLikes.size
                 val isLiked = if (activePersonaId != null) {
-                    likeDao.isPostLikedByPersonaDirect(post.id, activePersonaId)
+                    postLikes.any { it.personaId == activePersonaId }
                 } else false
-                val commentCount = commentDao.getCommentCountForPostDirect(post.id)
+                val commentCount = commentMap[post.id] ?: 0
 
                 PostWithDetails(
                     post = post,
@@ -79,17 +94,22 @@ class PostRepository(
     fun getPostDetails(postId: String, activePersonaId: String?): Flow<PostWithDetails?> {
         return combine(
             postDao.getPostById(postId),
-            personaDao.getAllPersonas()
-        ) { post, personas ->
+            personaDao.getAllPersonas(),
+            postDao.getAllPostMediaFlow(),
+            likeDao.getAllPostLikesFlow(),
+            commentDao.getAllCommentCountsFlow()
+        ) { post, personas, allMedia, allLikes, commentCounts ->
             if (post == null) return@combine null
             val personaMap = personas.associateBy { it.id }
             val author = personaMap[post.authorPersonaId] ?: return@combine null
-            val media = postDao.getMediaForPostDirect(post.id)
-            val likeCount = likeDao.getPostLikeCountDirect(post.id)
+            val media = allMedia.filter { it.postId == post.id }.sortedBy { it.orderIndex }
+            val postLikes = allLikes.filter { it.postId == post.id }
+            val likeCount = postLikes.size
             val isLiked = if (activePersonaId != null) {
-                likeDao.isPostLikedByPersonaDirect(post.id, activePersonaId)
+                postLikes.any { it.personaId == activePersonaId }
             } else false
-            val commentCount = commentDao.getCommentCountForPostDirect(post.id)
+            val commentMap = commentCounts.associate { it.postId to it.count }
+            val commentCount = commentMap[post.id] ?: 0
 
             PostWithDetails(
                 post = post,
@@ -108,15 +128,8 @@ class PostRepository(
         mediaUris: List<Pair<Uri, String?>>
     ): String {
         val postId = UUID.randomUUID().toString()
-        val post = PostEntity(
-            id = postId,
-            authorPersonaId = authorPersonaId,
-            textContent = textContent,
-            createdAt = System.currentTimeMillis(),
-            updatedAt = System.currentTimeMillis()
-        )
-        postDao.insertPost(post)
 
+        // 1. Ingest & compress all media first to prevent empty-media UI race conditions
         val mediaEntities = mutableListOf<PostMediaEntity>()
         mediaUris.forEachIndexed { index, (uri, mimeType) ->
             val asset = mediaManager.importMedia(uri, mimeType)
@@ -132,6 +145,18 @@ class PostRepository(
                 )
             }
         }
+
+        // 2. Insert post entity
+        val post = PostEntity(
+            id = postId,
+            authorPersonaId = authorPersonaId,
+            textContent = textContent,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        postDao.insertPost(post)
+
+        // 3. Insert post media records
         if (mediaEntities.isNotEmpty()) {
             postDao.insertPostMedia(mediaEntities)
         }

@@ -55,11 +55,16 @@ import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonViolet
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.SharedFlow
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
     posts: List<PostWithDetails>,
     activePersona: PersonaEntity?,
+    scrollToTopTrigger: SharedFlow<Unit>? = null,
     onOpenPersonaSwitcher: () -> Unit,
     onCreatePost: () -> Unit,
     onPostClick: (String) -> Unit,
@@ -71,6 +76,13 @@ fun FeedScreen(
     onDeletePost: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(scrollToTopTrigger) {
+        scrollToTopTrigger?.collect {
+            listState.animateScrollToItem(0)
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -212,13 +224,18 @@ fun FeedScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(posts, key = { it.post.id }) { postDetails ->
+                items(
+                    items = posts,
+                    key = { it.post.id },
+                    contentType = { "post_card" }
+                ) { postDetails ->
                     val isAuthor = activePersona != null && postDetails.author.id == activePersona.id
                     PostCard(
                         postWithDetails = postDetails,

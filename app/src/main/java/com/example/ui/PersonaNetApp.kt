@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -87,6 +89,9 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
     val isProcessingBackup by viewModel.isProcessingBackup.collectAsStateWithLifecycle()
     val exportSummary by viewModel.exportSummary.collectAsStateWithLifecycle()
     val importSummary by viewModel.importSummary.collectAsStateWithLifecycle()
+    val isPublishingPost by viewModel.isPublishingPost.collectAsStateWithLifecycle()
+    val activePersonaDraft by viewModel.getPostDraft(activePersona?.id ?: "")
+        .collectAsStateWithLifecycle(initialValue = "")
 
     var showCreatePostSheet by remember { mutableStateOf(false) }
     var showPersonaSwitcherSheet by remember { mutableStateOf(false) }
@@ -124,6 +129,8 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
             currentScreen is Screen.ActiveProfile
 
     Scaffold(
+        contentWindowInsets = WindowInsets.navigationBars,
+        containerColor = DarkSurface,
         bottomBar = {
             if (isTopLevelScreen) {
                 NavigationBar(
@@ -220,13 +227,14 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             when (val screen = currentScreen) {
                 is Screen.Feed -> {
                     FeedScreen(
                         posts = feedPosts,
                         activePersona = activePersona,
+                        scrollToTopTrigger = viewModel.scrollToTopTrigger,
                         onOpenPersonaSwitcher = { showPersonaSwitcherSheet = true },
                         onCreatePost = { showCreatePostSheet = true },
                         onPostClick = { postId ->
@@ -415,9 +423,15 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                 CreatePostDialog(
                     activePersona = activePersona!!,
                     allPersonas = allPersonas,
+                    initialDraft = activePersonaDraft,
+                    isPublishing = isPublishingPost,
+                    onDraftChange = { text ->
+                        viewModel.savePostDraft(activePersona!!.id, text)
+                    },
                     onPostCreated = { text, mediaList ->
-                        viewModel.createPost(text, mediaList)
-                        showCreatePostSheet = false
+                        viewModel.createPost(text, mediaList) {
+                            showCreatePostSheet = false
+                        }
                     },
                     onDismiss = { showCreatePostSheet = false }
                 )

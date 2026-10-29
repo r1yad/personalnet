@@ -82,6 +82,9 @@ fun PersonaAvatar(
                 model = ImageRequest.Builder(context)
                     .data(avatarFile)
                     .crossfade(true)
+                    .allowHardware(true)
+                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                     .build(),
                 contentDescription = "$name avatar",
                 contentScale = ContentScale.Crop,

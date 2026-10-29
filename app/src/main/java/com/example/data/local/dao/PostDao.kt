@@ -57,4 +57,7 @@ interface PostDao {
 
     @Query("SELECT * FROM post_media")
     suspend fun getAllPostMediaDirect(): List<PostMediaEntity>
+
+    @Query("SELECT * FROM post_media")
+    fun getAllPostMediaFlow(): Flow<List<PostMediaEntity>>
 }

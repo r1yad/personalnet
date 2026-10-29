@@ -47,8 +47,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -91,6 +96,34 @@ fun PostCard(
             DateUtils.MINUTE_IN_MILLIS,
             DateUtils.FORMAT_ABBREV_RELATIVE
         ).toString()
+    }
+
+    var isLikedOptimistic by remember(postWithDetails.isLikedByActivePersona) {
+        mutableStateOf(postWithDetails.isLikedByActivePersona)
+    }
+    var likeCountOptimistic by remember(postWithDetails.likeCount) {
+        mutableIntStateOf(postWithDetails.likeCount)
+    }
+    var animateTrigger by remember { mutableStateOf(false) }
+
+    val heartScale by animateFloatAsState(
+        targetValue = if (animateTrigger) 1.35f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        finishedListener = { animateTrigger = false },
+        label = "heart_bounce"
+    )
+
+    val handleLikeTap = {
+        val willBeLiked = !isLikedOptimistic
+        isLikedOptimistic = willBeLiked
+        likeCountOptimistic = if (willBeLiked) likeCountOptimistic + 1 else maxOf(0, likeCountOptimistic - 1)
+        if (willBeLiked) {
+            animateTrigger = true
+        }
+        onLikeClick()
     }
 
     Card(
@@ -218,27 +251,29 @@ fun PostCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Like action
+                // Like action with bouncy scale animation and optimistic state
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { onLikeClick() }
+                        .clickable { handleLikeTap() }
                         .padding(horizontal = 8.dp, vertical = 6.dp)
                         .testTag("like_button_${post.id}")
                 ) {
                     Icon(
-                        imageVector = if (postWithDetails.isLikedByActivePersona) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        imageVector = if (isLikedOptimistic) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Like",
-                        tint = if (postWithDetails.isLikedByActivePersona) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (isLikedOptimistic) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .graphicsLayer(scaleX = heartScale, scaleY = heartScale)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "${postWithDetails.likeCount}",
+                        text = "$likeCountOptimistic",
                         fontSize = 13.sp,
-                        fontWeight = if (postWithDetails.isLikedByActivePersona) FontWeight.Bold else FontWeight.Normal,
-                        color = if (postWithDetails.isLikedByActivePersona) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant
+                        fontWeight = if (isLikedOptimistic) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isLikedOptimistic) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -302,7 +337,13 @@ fun PostMediaGallery(
                 .clickable { onMediaClick(item.mediaPath) }
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(file).crossfade(true).build(),
+                model = ImageRequest.Builder(context)
+                    .data(file)
+                    .crossfade(true)
+                    .allowHardware(true)
+                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .build(),
                 contentDescription = "Post photo",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)
@@ -335,7 +376,13 @@ fun PostMediaGallery(
                         .clickable { onMediaClick(item.mediaPath) }
                 ) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(file).crossfade(true).build(),
+                        model = ImageRequest.Builder(context)
+                            .data(file)
+                            .crossfade(true)
+                            .allowHardware(true)
+                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                            .build(),
                         contentDescription = "Post image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

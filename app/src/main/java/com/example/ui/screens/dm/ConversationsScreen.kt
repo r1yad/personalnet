@@ -217,7 +217,11 @@ fun ConversationsScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(filteredConversations, key = { it.conversation.id }) { convDetails ->
+                        items(
+                            items = filteredConversations,
+                            key = { it.conversation.id },
+                            contentType = { "conversation_item" }
+                        ) { convDetails ->
                             ConversationItem(
                                 details = convDetails,
                                 onClick = { onOpenConversation(convDetails.conversation.id, convDetails.otherPersona.id) },

@@ -1,79 +1,131 @@
-# Automatic Android APK Compilation via GitHub Actions
+# PersonaNet v1.1: Performance, Lag Optimization & System Insets Plan (Revised)
 
-This plan details the configuration and workflow setup to enable automated native Android APK compilation using GitHub Actions on every push to the `main` branch, pull requests, and manual triggers (`workflow_dispatch`).
+Comprehensive architecture and implementation plan addressing:
+1. **Status Bar Visibility, Overlapping Content & System Insets** (Light status-bar icons, solid DarkSurface status background, prevention of content drawing under system icons).
+2. **App Performance & Lag Elimination** (Room N+1 query batching, Compose `@Immutable` skipping, LazyColumn `contentType`, Coil memory caching & downsampling).
+3. **APK Size Reduction** (Unused Firebase dependency pruning, release build R8 shrinking).
+
+---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Confirmed Configuration Choices**:
-> - **CI Triggers**: The GitHub Actions workflow will trigger on pushes to `main`, pull requests targeting `main`, and manual execution via `workflow_dispatch`.
-> - **Build Target & Output**: The workflow will compile the project via `./gradlew assembleDebug`, upload the generated APK from `app/build/outputs/apk/debug/` as a downloadable GitHub Actions artifact, and require no external paid services or sensitive secrets.
-> - **CI Environment Resilience**: The workflow will automatically provide a fallback debug keystore generation step and `.env` fallback so that any clean clone in GitHub Actions runner builds reliably out-of-the-box.
+> **Key Architecture Decisions for System Bars & Inset Handling**:
+> - **Light Status Bar Icons on Dark Theme**: Explicitly configure `enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(...), navigationBarStyle = SystemBarStyle.dark(...))` and set `WindowInsetsController.isAppearanceLightStatusBars = false` and `isAppearanceLightNavigationBars = false`. This guarantees status bar icons (clock, battery, Wi-Fi) and navigation buttons are crisp white/light and NEVER disappear or turn black on dark backgrounds.
+> - **Solid Dark Material You Status Bar Separation**: Provide a solid `DarkSurface` (`0xFF12151F`) background across all top bars and status bar insets. App feed items, profile photos, and text will never bleed or merge into status bar icons while scrolling.
+> - **Unified Inset Architecture**: Root and screen Scaffolds are aligned so every screen (`Feed`, `DMs`, `Personas`, `Profile`, `Detail`, `Settings`, `Chat`) uses consistent `statusBars` handling with zero unexpected blank gaps and zero overlapping.
+> - **Performance Architecture**: Batch comment counts in Room, mark Compose models `@Immutable` for zero-cost recomposition skipping, downsample thumbnails in Coil, comment out unused Firebase libraries, and enable R8 release shrinking.
 
 ---
 
 ### 1. Overview & Core Concept
 
-- **What It Does**: Provides a production-ready CI pipeline that checks out the codebase, sets up the required JDK, verifies the Android SDK components, builds the native Android application into an installable APK using Gradle, and publishes the debug APK as a downloadable artifact.
-- **Key Value**: Enables automated, reliable build verification and instant distribution of test APKs on GitHub without requiring manual local build machines or cloud signing infrastructure.
+PersonaNet v1.1 will achieve rock-solid visual consistency and fluid 60/120 FPS performance:
+
+1. **System Bar Integrity**: The Android status bar remains consistently visible, legible, and separated by a dark Material You surface. No screen or modal will cause status bar icons to disappear, turn dark, or merge into scrollable content.
+2. **Smooth & Responsive Compose UI**: Eliminates recomposition stutters across the feed and direct message lists by providing `@Immutable` annotations, stable keys, and LazyColumn item content types.
+3. **Optimized Database Operations**: Replaces the synchronous N+1 `commentDao.getCommentCountForPostDirect()` loop in `PostRepository` with an efficient single reactive `GROUP BY` batch query.
+4. **Fast, Lightweight Media Decoding**: Downsamples image loading to fit feed/DM display dimensions with Coil hardware bitmaps and memory caching.
+5. **Clean Release APK**: Comments out unused template Firebase dependencies and enables R8 code and resource shrinking for release APK packaging.
 
 ---
 
-### 2. User Experience & CI Workflow
+### 2. User Experience & Visual Design
 
-#### Workflow Lifecycle (`.github/workflows/android.yml`)
-1. **Trigger**: Push to `main`, Pull Request to `main`, or Manual Dispatch (`workflow_dispatch`).
-2. **Environment Setup**:
-   - Runner: `ubuntu-latest`.
-   - Java: Setup Temurin JDK 17 with Gradle cache enabled (`actions/setup-java@v4`).
-   - Android SDK: Pre-installed in `ubuntu-latest` runner with Android SDK Build-Tools and Platform 36.
-3. **Pre-Build Preparation**:
-   - Make `./gradlew` executable (`chmod +x gradlew`).
-   - Copy `.env.example` to `.env` if missing so Secrets Gradle plugin resolves without errors.
-   - Generate standard `debug.keystore` in project root if not tracked by git, ensuring `debugConfig` signing succeeds.
-4. **Build & Test**:
-   - Execute `./gradlew assembleDebug` (plus optional unit test verification).
-5. **Artifact Publishing**:
-   - Upload APK located at `app/build/outputs/apk/debug/app-debug.apk` using `actions/upload-artifact@v4` with retention period.
+- **Status Bar Appearance**: The physical status bar displays crisp, bright white system indicators (time, notifications, network, battery) resting on a clean `DarkSurface` (`#12151F`) tone that matches the app's top app bar and dark theme.
+- **Header & Feed Visual Separation**: When scrolling feeds or conversation lists, cards and text slide cleanly underneath the opaque top app bar without bleeding into the status icons.
+- **Full-Screen Media & Dialogs**: Bottom sheets (`CreatePostDialog`, `PersonaSwitcherBottomSheet`) and full-screen image viewers properly respect status bar and navigation bar insets with scrim backdrops.
+- **Scroll & Transition Fluidity**: Rapid flings through feeds and direct messages remain smooth without stutter or frame drops.
 
 ---
 
-### 3. Key Technical Decisions & Trade-Offs
+### 3. Key Technical Decisions & System Architecture
 
-- **Decision 1: Full Gradle Wrapper Generation (`gradlew`, `gradlew.bat`, `gradle-wrapper.jar`)**
-  - *Chosen Approach*: Generate the missing Gradle wrapper binaries and scripts matching `gradle-wrapper.properties` (Gradle 9.3.1) so that GitHub Actions runners execute `./gradlew assembleDebug` seamlessly without depending on system Gradle.
-  - *Why*: Standard GitHub Actions workflows require `./gradlew`.
-- **Decision 2: Debug Keystore Generation in CI**
-  - *Chosen Approach*: Add a step in `android.yml` to generate `debug.keystore` using `keytool` if it is not present in root.
-  - *Why*: `debug.keystore` is ignored by `.gitignore` and must never be hardcoded or checked into public repositories, yet `app/build.gradle.kts` references `storeFile = file("${rootDir}/debug.keystore")`.
-- **Decision 3: Secrets Plugin & Google Services Fallback**
-  - *Chosen Approach*: Ensure `missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN` remains active and copy `.env.example` to `.env` during workflow run.
-  - *Why*: Guarantees that public GitHub repositories compile without failing on private Google Services or secrets files.
+#### A. System Bar Configuration (`MainActivity.kt` & `Theme.kt`)
+- Call `enableEdgeToEdge` with explicit dark styles:
+  ```kotlin
+  enableEdgeToEdge(
+      statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+      navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+  )
+  ```
+- In `MainActivity.onCreate`, configure `WindowCompat.getInsetsController`:
+  ```kotlin
+  WindowCompat.getInsetsController(window, window.decorView).apply {
+      isAppearanceLightStatusBars = false
+      isAppearanceLightNavigationBars = false
+  }
+  ```
+- Ensure window background color is `#12151F` to prevent light flashes or white bars during transitions.
+
+#### B. Scaffold & Top Bar Inset Harmonization
+- In `PersonaNetApp.kt`, configure root Scaffold with `contentWindowInsets = WindowInsets.statusBars` and add a solid top status-bar surface, ensuring screen headers align flush with system insets without double-padding or under-drawing.
+- Ensure all screens (`FeedScreen`, `ChatScreen`, `ConversationsScreen`, `PersonaProfileScreen`, `EditPersonaScreen`, `PostDetailScreen`, `BackupSettingsScreen`) have opaque `DarkSurface` top app bars with standard `TopAppBarDefaults.windowInsets`.
+
+#### C. Database Query Optimization (Eliminating N+1 Reads)
+- Add to `CommentDao`:
+  ```kotlin
+  @Query("SELECT postId, COUNT(*) as count FROM comments GROUP BY postId")
+  fun getAllCommentCountsFlow(): Flow<List<PostCommentCount>>
+  ```
+- In `PostRepository.getFeedPosts` and `getPostsByPersona`, replace the per-post synchronous `commentDao.getCommentCountForPostDirect(post.id)` call with an in-memory map lookup:
+  ```kotlin
+  val commentMap = commentCounts.associate { it.postId to it.count }
+  // ...
+  commentCount = commentMap[post.id] ?: 0
+  ```
+
+#### D. Compose Recomposition & Skipping Optimization
+- Annotate `PostWithDetails`, `MessageWithDetails`, `ConversationWithDetails`, and `PersonaEntity` with `@androidx.compose.runtime.Immutable`.
+- Add `contentType = { "post_card" }` and `contentType = { "chat_message" }` to `LazyColumn` item blocks.
+
+#### E. Coil Image Downsampling & Caching
+- Update `AsyncImage` in `PostMediaGallery` and `PersonaAvatar` with `precision(Precision.INEXACT)`, `allowHardware(true)`, and `memoryCachePolicy(CachePolicy.ENABLED)`.
+
+#### F. Release APK Optimization
+- Comment out unused Firebase libraries (`libs.firebase.ai`, `libs.firebase.appcheck.recaptcha`, `libs.firebase.appcheck.debug`) in `app/build.gradle.kts`.
+- Remove unreferenced media assets in `res/raw/`.
+- Enable R8 shrinking in `buildTypes.release`:
+  ```kotlin
+  release {
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      signingConfig = signingConfigs.getByName("release")
+  }
+  ```
+- Configure keep rules in `app/proguard-rules.pro` for Room, Moshi, and Compose models.
 
 ---
 
-### 4. Technical Architecture & Component Flow
+### 4. Technical Architecture Diagram
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   GitHub Repository                    │
-│   Push to 'main' / Pull Request / workflow_dispatch    │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│         GitHub Actions Runner (ubuntu-latest)          │
-├────────────────────────────────────────────────────────┤
-│ 1. actions/checkout@v4                                 │
-│ 2. actions/setup-java@v4 (JDK 17 + Gradle Cache)       │
-│ 3. chmod +x ./gradlew                                  │
-│ 4. Environment Fallbacks (.env & debug.keystore check) │
-│ 5. ./gradlew assembleDebug                             │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│                    Build Outputs                       │
-│ - app/build/outputs/apk/debug/app-debug.apk            │
-│ - actions/upload-artifact@v4                           │
-│   Artifact: "personanet-debug-apk"                     │
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Android System Status Bar (White Icons on #12151F DarkSurface)   │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │ WindowInsets.statusBars
+┌────────────────────────────────▼─────────────────────────────────┐
+│ TopAppBar (Opaque DarkSurface, Title, Actions, Back Navigation)  │
+├──────────────────────────────────────────────────────────────────┤
+│ Compose LazyColumn (contentType, stable keys, @Immutable models) │
+│   - PostCard / MessageBubble (recomposition skipping enabled)    │
+│   - Coil AsyncImage (hardware bitmaps, memory cached)            │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼─────────────────────────────────┐
+│ PostRepository (Batch Reactive Combining with 0 N+1 Queries)    │
+│   - PostsFlow + PersonasFlow + MediaFlow + CommentCountsFlow     │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼─────────────────────────────────┐
+│ Room Database (SQLite with Indexed Foreign Keys & Aggregations)  │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+#### Verification Plan
+1. **Compilation**: Run `compile_applet`.
+2. **Unit Tests**: Run `gradle :app:testDebugUnitTest`.
+3. **APK Size**: Measure and report APK sizes before and after optimizations.
+4. **Visual Inspection**: Verify status bar visibility and contrast across screens.

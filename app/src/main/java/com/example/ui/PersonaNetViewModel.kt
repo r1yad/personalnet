@@ -20,9 +20,11 @@ import com.example.data.repository.ConversationRepository
 import com.example.data.repository.PersonaRepository
 import com.example.data.repository.PostRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -163,14 +165,46 @@ class PersonaNetViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun createPost(textContent: String, mediaList: List<Pair<Uri, String?>>) {
+    private val _isPublishingPost = MutableStateFlow(false)
+    val isPublishingPost = _isPublishingPost.asStateFlow()
+
+    private val _scrollToTopTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val scrollToTopTrigger = _scrollToTopTrigger.asSharedFlow()
+
+    fun createPost(
+        textContent: String,
+        mediaList: List<Pair<Uri, String?>>,
+        onFinished: ((String) -> Unit)? = null
+    ) {
         val currentPersona = activePersona.value ?: return
         viewModelScope.launch {
-            postRepo.createPost(
-                authorPersonaId = currentPersona.id,
-                textContent = textContent,
-                mediaUris = mediaList
-            )
+            _isPublishingPost.value = true
+            try {
+                val newPostId = postRepo.createPost(
+                    authorPersonaId = currentPersona.id,
+                    textContent = textContent,
+                    mediaUris = mediaList
+                )
+                preferences.clearPostDraft(currentPersona.id)
+                _scrollToTopTrigger.tryEmit(Unit)
+                onFinished?.invoke(newPostId)
+            } finally {
+                _isPublishingPost.value = false
+            }
+        }
+    }
+
+    fun getPostDraft(personaId: String) = preferences.getPostDraft(personaId)
+
+    fun savePostDraft(personaId: String, text: String) {
+        viewModelScope.launch {
+            preferences.savePostDraft(personaId, text)
+        }
+    }
+
+    fun clearPostDraft(personaId: String) {
+        viewModelScope.launch {
+            preferences.clearPostDraft(personaId)
         }
     }
 

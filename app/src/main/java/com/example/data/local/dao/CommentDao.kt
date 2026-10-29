@@ -9,8 +9,16 @@ import androidx.room.Update
 import com.example.data.local.entity.CommentEntity
 import kotlinx.coroutines.flow.Flow
 
+data class PostCommentCount(
+    val postId: String,
+    val count: Int
+)
+
 @Dao
 interface CommentDao {
+    @Query("SELECT postId, COUNT(*) as count FROM comments GROUP BY postId")
+    fun getAllCommentCountsFlow(): Flow<List<PostCommentCount>>
+
     @Query("SELECT * FROM comments WHERE postId = :postId ORDER BY createdAt ASC")
     fun getCommentsForPost(postId: String): Flow<List<CommentEntity>>
 

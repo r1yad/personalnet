@@ -35,6 +35,9 @@ interface LikeDao {
     @Query("SELECT * FROM post_likes")
     suspend fun getAllPostLikesDirect(): List<PostLikeEntity>
 
+    @Query("SELECT * FROM post_likes")
+    fun getAllPostLikesFlow(): Flow<List<PostLikeEntity>>
+
     // Comment Likes
     @Query("SELECT COUNT(*) FROM comment_likes WHERE commentId = :commentId")
     fun getCommentLikeCount(commentId: String): Flow<Int>

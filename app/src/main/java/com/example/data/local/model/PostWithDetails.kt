@@ -1,9 +1,11 @@
 package com.example.data.local.model
 
+import androidx.compose.runtime.Immutable
 import com.example.data.local.entity.PersonaEntity
 import com.example.data.local.entity.PostEntity
 import com.example.data.local.entity.PostMediaEntity
 
+@Immutable
 data class PostWithDetails(
     val post: PostEntity,
     val author: PersonaEntity,
