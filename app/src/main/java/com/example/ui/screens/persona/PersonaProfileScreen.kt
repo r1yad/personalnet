@@ -87,6 +87,8 @@ fun PersonaProfileScreen(
     onLikePost: (String) -> Unit,
     onOpenMedia: (String) -> Unit,
     onMentionClick: (String) -> Unit,
+    onEditPost: (PostWithDetails) -> Unit = {},
+    onDeletePost: (String) -> Unit = {},
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -301,6 +303,8 @@ fun PersonaProfileScreen(
                             onProfileClick = { /* already here */ },
                             onMediaClick = onOpenMedia,
                             onMentionClick = onMentionClick,
+                            onEditClick = if (isActivePersona) { { onEditPost(postDetails) } } else null,
+                            onDeleteClick = if (isActivePersona) { { onDeletePost(postDetails.post.id) } } else null,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
                     }

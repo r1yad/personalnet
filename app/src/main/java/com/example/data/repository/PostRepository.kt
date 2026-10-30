@@ -168,6 +168,50 @@ class PostRepository(
         postDao.updatePost(post.copy(textContent = newText, updatedAt = System.currentTimeMillis()))
     }
 
+    suspend fun updatePostWithMedia(
+        postId: String,
+        newText: String,
+        keptMediaIds: List<String>,
+        newMediaUris: List<Pair<Uri, String?>>
+    ) {
+        val post = postDao.getPostByIdDirect(postId) ?: return
+        val existingMedia = postDao.getMediaForPostDirect(postId)
+
+        // 1. Filter existing media that the user chose to keep
+        val keptMedia = existingMedia.filter { it.id in keptMediaIds }
+
+        // 2. Import & compress newly added media
+        val newMediaEntities = mutableListOf<PostMediaEntity>()
+        newMediaUris.forEach { (uri, mimeType) ->
+            val asset = mediaManager.importMedia(uri, mimeType)
+            if (asset != null) {
+                newMediaEntities.add(
+                    PostMediaEntity(
+                        id = UUID.randomUUID().toString(),
+                        postId = postId,
+                        mediaPath = asset.relativePath,
+                        mimeType = asset.mimeType,
+                        orderIndex = 0
+                    )
+                )
+            }
+        }
+
+        // 3. Re-assign order indexes across all retained + new media
+        val allFinalMedia = (keptMedia + newMediaEntities).mapIndexed { index, entity ->
+            entity.copy(orderIndex = index)
+        }
+
+        // 4. Update database media records
+        postDao.deleteMediaForPost(postId)
+        if (allFinalMedia.isNotEmpty()) {
+            postDao.insertPostMedia(allFinalMedia)
+        }
+
+        // 5. Update post entity text and updatedAt timestamp
+        postDao.updatePost(post.copy(textContent = newText, updatedAt = System.currentTimeMillis()))
+    }
+
     suspend fun deletePost(postId: String) {
         postDao.deletePostById(postId)
     }

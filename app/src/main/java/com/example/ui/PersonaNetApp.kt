@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entity.PersonaEntity
+import com.example.data.local.model.PostWithDetails
 import com.example.ui.components.MediaViewerDialog
 import com.example.ui.components.PersonaAvatar
 import com.example.ui.components.PersonaSwitcherBottomSheet
@@ -49,6 +50,7 @@ import com.example.ui.screens.backup.BackupSettingsScreen
 import com.example.ui.screens.dm.ChatScreen
 import com.example.ui.screens.dm.ConversationsScreen
 import com.example.ui.screens.feed.CreatePostDialog
+import com.example.ui.screens.feed.EditPostDialog
 import com.example.ui.screens.feed.FeedScreen
 import com.example.ui.screens.feed.PostDetailScreen
 import com.example.ui.screens.persona.EditPersonaScreen
@@ -95,6 +97,7 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
 
     var showCreatePostSheet by remember { mutableStateOf(false) }
     var showPersonaSwitcherSheet by remember { mutableStateOf(false) }
+    var postToEdit by remember { mutableStateOf<PostWithDetails?>(null) }
     var fullscreenMediaPath by remember { mutableStateOf<String?>(null) }
 
     val switcherSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -248,7 +251,7 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                             val target = allPersonas.find { it.username.equals(username, ignoreCase = true) }
                             if (target != null) currentScreen = Screen.ViewProfile(target.id)
                         },
-                        onEditPost = { postId, newText -> viewModel.updatePost(postId, newText) },
+                        onEditPost = { postWithDetails -> postToEdit = postWithDetails },
                         onDeletePost = { postId -> viewModel.deletePost(postId) },
                         onRefresh = {}
                     )
@@ -306,6 +309,8 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                                 val target = allPersonas.find { it.username.equals(username, ignoreCase = true) }
                                 if (target != null) currentScreen = Screen.ViewProfile(target.id)
                             },
+                            onEditPost = { postWithDetails -> postToEdit = postWithDetails },
+                            onDeletePost = { postId -> viewModel.deletePost(postId) },
                             onBack = { currentScreen = Screen.Feed }
                         )
                     } ?: run {
@@ -362,6 +367,8 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                                 val target = allPersonas.find { it.username.equals(username, ignoreCase = true) }
                                 if (target != null) currentScreen = Screen.ViewProfile(target.id)
                             },
+                            onEditPost = { postWithDetails -> postToEdit = postWithDetails },
+                            onDeletePost = { postId -> viewModel.deletePost(postId) },
                             onBack = { currentScreen = Screen.Personas }
                         )
                     }
@@ -409,6 +416,15 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                                 val target = allPersonas.find { it.username.equals(username, ignoreCase = true) }
                                 if (target != null) currentScreen = Screen.ViewProfile(target.id)
                             },
+                            onEditPost = { postWithDetails -> postToEdit = postWithDetails },
+                            onDeletePost = { postId ->
+                                viewModel.deletePost(postId)
+                                viewModel.closePostDetails()
+                                currentScreen = Screen.Feed
+                            },
+                            onEditComment = { commentId, newText ->
+                                viewModel.updateComment(commentId, newText)
+                            },
                             onBack = {
                                 viewModel.closePostDetails()
                                 currentScreen = Screen.Feed
@@ -418,7 +434,7 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                 }
             }
 
-            // Create Post Sheet
+            // Create Post Sheet (Full Window)
             if (showCreatePostSheet && activePersona != null) {
                 CreatePostDialog(
                     activePersona = activePersona!!,
@@ -435,6 +451,28 @@ fun PersonaNetApp(viewModel: PersonaNetViewModel) {
                     },
                     onDismiss = { showCreatePostSheet = false }
                 )
+            }
+
+            // Edit Post Dialog (Full Window)
+            postToEdit?.let { targetPost ->
+                if (activePersona != null) {
+                    EditPostDialog(
+                        postWithDetails = targetPost,
+                        activePersona = activePersona!!,
+                        allPersonas = allPersonas,
+                        onSave = { newText, keptMediaIds, newMediaUris ->
+                            viewModel.updatePostWithMedia(
+                                postId = targetPost.post.id,
+                                newText = newText,
+                                keptMediaIds = keptMediaIds,
+                                newMediaUris = newMediaUris
+                            ) {
+                                postToEdit = null
+                            }
+                        },
+                        onDismiss = { postToEdit = null }
+                    )
+                }
             }
 
             // Persona Switcher Bottom Sheet

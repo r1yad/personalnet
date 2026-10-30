@@ -1,6 +1,7 @@
 package com.example.ui.screens.feed
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -14,13 +15,16 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,10 +65,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.local.entity.PersonaEntity
@@ -100,10 +107,12 @@ fun CreatePostDialog(
         onDraftChange(textContent)
     }
 
+    val maxPhotos = 5
     val mediaPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
-        uris.forEach { uri ->
+        val availableSlots = maxPhotos - selectedMediaUris.size
+        uris.take(availableSlots).forEach { uri ->
             val mimeType = context.contentResolver.getType(uri) ?: "image/webp"
             selectedMediaUris.add(Pair(uri, mimeType))
         }
@@ -130,18 +139,39 @@ fun CreatePostDialog(
         RoleplayAssistant.generatePostSuggestions(activePersona, selectedTone)
     }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurface,
-        tonalElevation = 8.dp,
-        modifier = Modifier.fillMaxSize()
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
     ) {
-        Column(
+        val isKeyboardOpen = WindowInsets.isImeVisible
+        val keyboardController = LocalSoftwareKeyboardController.current
+
+        BackHandler(enabled = true) {
+            if (isKeyboardOpen) {
+                keyboardController?.hide()
+            } else {
+                onDismiss()
+            }
+        }
+
+        Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 6.dp)
+                .background(DarkSurface),
+            color = DarkSurface
         ) {
-            // Header
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+            ) {
+                // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -261,6 +291,13 @@ fun CreatePostDialog(
                 // Media attachment previews
                 if (selectedMediaUris.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "Attached Photos (${selectedMediaUris.size}/$maxPhotos):",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -402,14 +439,19 @@ fun CreatePostDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Button(
-                        onClick = { mediaPicker.launch("image/*") },
+                        onClick = {
+                            if (selectedMediaUris.size < maxPhotos) {
+                                mediaPicker.launch("image/*")
+                            }
+                        },
+                        enabled = selectedMediaUris.size < maxPhotos,
                         colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated, contentColor = NeonCyan),
                         shape = RoundedCornerShape(10.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, DarkCardBorder)
                     ) {
                         Icon(imageVector = Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Media (${selectedMediaUris.size})", fontSize = 13.sp)
+                        Text("Photos (${selectedMediaUris.size}/$maxPhotos)", fontSize = 13.sp)
                     }
 
                     Button(
@@ -441,4 +483,5 @@ fun CreatePostDialog(
             }
         }
     }
+}
 }

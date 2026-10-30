@@ -27,9 +27,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Reply
@@ -48,6 +52,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -87,11 +93,15 @@ fun PostDetailScreen(
     onProfileClick: (String) -> Unit,
     onMediaClick: (String) -> Unit,
     onMentionClick: (String) -> Unit,
+    onEditPost: (PostWithDetails) -> Unit = {},
+    onDeletePost: (String) -> Unit = {},
+    onEditComment: (String, String) -> Unit = { _, _ -> },
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     var commentText by remember { mutableStateOf("") }
     var replyingToComment by remember { mutableStateOf<CommentWithDetails?>(null) }
+    var editingComment by remember { mutableStateOf<CommentWithDetails?>(null) }
     var showRpReplies by remember { mutableStateOf(false) }
 
     val rpQuickReplies = remember(activePersona) {
@@ -240,13 +250,16 @@ fun PostDetailScreen(
         ) {
             // Main Post
             item {
+                val isPostAuthor = postWithDetails.author.id == activePersona.id
                 PostCard(
                     postWithDetails = postWithDetails,
                     onPostClick = {},
                     onLikeClick = onLikePost,
                     onProfileClick = { onProfileClick(postWithDetails.author.id) },
                     onMediaClick = onMediaClick,
-                    onMentionClick = onMentionClick
+                    onMentionClick = onMentionClick,
+                    onEditClick = if (isPostAuthor) { { onEditPost(postWithDetails) } } else null,
+                    onDeleteClick = if (isPostAuthor) { { onDeletePost(postWithDetails.post.id) } } else null
                 )
             }
 
@@ -298,6 +311,7 @@ fun PostDetailScreen(
                             replyingToComment = target
                             commentText = "@${target.author.username} "
                         },
+                        onEditClick = { target -> editingComment = target },
                         onLikeClick = onLikeComment,
                         onDeleteClick = onDeleteComment,
                         onProfileClick = onProfileClick,
@@ -307,6 +321,20 @@ fun PostDetailScreen(
             }
         }
     }
+
+    // Full-Window Comment Editor
+    editingComment?.let { targetComment ->
+        EditCommentDialog(
+            commentWithDetails = targetComment,
+            activePersona = activePersona,
+            allPersonas = allPersonas,
+            onSave = { newText ->
+                onEditComment(targetComment.comment.id, newText)
+                editingComment = null
+            },
+            onDismiss = { editingComment = null }
+        )
+    }
 }
 
 @Composable
@@ -315,6 +343,7 @@ fun CommentNodeView(
     depth: Int,
     activePersonaId: String,
     onReplyClick: (CommentWithDetails) -> Unit,
+    onEditClick: (CommentWithDetails) -> Unit,
     onLikeClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
     onProfileClick: (String) -> Unit,
@@ -378,16 +407,30 @@ fun CommentNodeView(
                     }
 
                     if (author.id == activePersonaId) {
-                        IconButton(
-                            onClick = { onDeleteClick(comment.id) },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Delete comment",
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                modifier = Modifier.size(14.dp)
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { onEditClick(commentNode) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit comment",
+                                    tint = NeonCyan.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { onDeleteClick(comment.id) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete comment",
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -404,6 +447,34 @@ fun CommentNodeView(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Actions: Like comment & Reply
+                var isLikedOptimistic by remember(commentNode.isLikedByActivePersona) {
+                    mutableStateOf(commentNode.isLikedByActivePersona)
+                }
+                var likeCountOptimistic by remember(commentNode.likeCount) {
+                    mutableIntStateOf(commentNode.likeCount)
+                }
+                var animateTrigger by remember { mutableStateOf(false) }
+
+                val heartScale by animateFloatAsState(
+                    targetValue = if (animateTrigger) 1.35f else 1.0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    finishedListener = { animateTrigger = false },
+                    label = "comment_heart_bounce"
+                )
+
+                val handleLikeTap = {
+                    val willBeLiked = !isLikedOptimistic
+                    isLikedOptimistic = willBeLiked
+                    likeCountOptimistic = if (willBeLiked) likeCountOptimistic + 1 else maxOf(0, likeCountOptimistic - 1)
+                    if (willBeLiked) {
+                        animateTrigger = true
+                    }
+                    onLikeClick(comment.id)
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -413,20 +484,26 @@ fun CommentNodeView(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .clickable { onLikeClick(comment.id) }
+                            .clickable { handleLikeTap() }
                             .padding(4.dp)
                     ) {
                         Icon(
-                            imageVector = if (commentNode.isLikedByActivePersona) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            imageVector = if (isLikedOptimistic) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Like comment",
-                            tint = if (commentNode.isLikedByActivePersona) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
+                            tint = if (isLikedOptimistic) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .graphicsLayer {
+                                    scaleX = heartScale
+                                    scaleY = heartScale
+                                }
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "${commentNode.likeCount}",
+                            text = "$likeCountOptimistic",
                             fontSize = 12.sp,
-                            color = if (commentNode.isLikedByActivePersona) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = if (isLikedOptimistic) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isLikedOptimistic) LikeRed else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -454,6 +531,7 @@ fun CommentNodeView(
                     depth = depth + 1,
                     activePersonaId = activePersonaId,
                     onReplyClick = onReplyClick,
+                    onEditClick = onEditClick,
                     onLikeClick = onLikeClick,
                     onDeleteClick = onDeleteClick,
                     onProfileClick = onProfileClick,

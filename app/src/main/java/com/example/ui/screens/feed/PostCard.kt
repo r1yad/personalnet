@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -326,14 +328,16 @@ fun PostMediaGallery(
     onMediaClick: (String) -> Unit
 ) {
     val context = LocalContext.current
+    if (mediaList.isEmpty()) return
+
     if (mediaList.size == 1) {
         val item = mediaList.first()
         val file = File(context.filesDir, item.mediaPath)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 180.dp, max = 320.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .heightIn(min = 200.dp, max = 340.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .clickable { onMediaClick(item.mediaPath) }
         ) {
             AsyncImage(
@@ -346,7 +350,9 @@ fun PostMediaGallery(
                     .build(),
                 contentDescription = "Post photo",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp, max = 340.dp)
             )
             if (item.mimeType.startsWith("video/")) {
                 Box(
@@ -361,18 +367,24 @@ fun PostMediaGallery(
             }
         }
     } else {
-        // Grid of 2 or more media
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        // Multi-image Instagram-style slide carousel
+        val pagerState = rememberPagerState(pageCount = { mediaList.size })
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .clip(RoundedCornerShape(14.dp))
         ) {
-            mediaList.take(3).forEach { item ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val item = mediaList[page]
                 val file = File(context.filesDir, item.mediaPath)
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .fillMaxSize()
                         .clickable { onMediaClick(item.mediaPath) }
                 ) {
                     AsyncImage(
@@ -383,9 +395,61 @@ fun PostMediaGallery(
                             .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
                             .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                             .build(),
-                        contentDescription = "Post image",
+                        contentDescription = "Post photo ${page + 1}",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
+                    )
+
+                    if (item.mimeType.startsWith("video/")) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(48.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Play video", tint = Color.White)
+                        }
+                    }
+                }
+            }
+
+            // Instagram-style badge: "1/3" counter in top right
+            Surface(
+                color = Color.Black.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+            ) {
+                Text(
+                    text = "${pagerState.currentPage + 1}/${mediaList.size}",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            // Instagram-style pagination dots indicator at bottom center
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 10.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(mediaList.size) { index ->
+                    val isSelected = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .size(if (isSelected) 7.dp else 5.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) NeonCyan else Color.White.copy(alpha = 0.5f)
+                            )
                     )
                 }
             }

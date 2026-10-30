@@ -214,6 +214,19 @@ class PersonaNetViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun updatePostWithMedia(
+        postId: String,
+        newText: String,
+        keptMediaIds: List<String>,
+        newMediaUris: List<Pair<Uri, String?>>,
+        onFinished: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            postRepo.updatePostWithMedia(postId, newText, keptMediaIds, newMediaUris)
+            onFinished?.invoke()
+        }
+    }
+
     fun deletePost(postId: String) {
         viewModelScope.launch {
             postRepo.deletePost(postId)
@@ -260,6 +273,12 @@ class PersonaNetViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteComment(commentId: String) {
         viewModelScope.launch {
             commentRepo.deleteComment(commentId)
+        }
+    }
+
+    fun updateComment(commentId: String, newText: String) {
+        viewModelScope.launch {
+            commentRepo.updateComment(commentId, newText)
         }
     }
 

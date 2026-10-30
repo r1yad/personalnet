@@ -72,7 +72,7 @@ fun FeedScreen(
     onProfileClick: (String) -> Unit,
     onMediaClick: (String) -> Unit,
     onMentionClick: (String) -> Unit,
-    onEditPost: (String, String) -> Unit,
+    onEditPost: (PostWithDetails) -> Unit = {},
     onDeletePost: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -244,6 +244,7 @@ fun FeedScreen(
                         onProfileClick = { onProfileClick(postDetails.author.id) },
                         onMediaClick = onMediaClick,
                         onMentionClick = onMentionClick,
+                        onEditClick = if (isAuthor) { { onEditPost(postDetails) } } else null,
                         onDeleteClick = if (isAuthor) { { onDeletePost(postDetails.post.id) } } else null
                     )
                 }
